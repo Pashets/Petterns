@@ -1,6 +1,5 @@
 # Конфігурація для патернів
-WINDOW_EXTREMUM = 20  # Вікно для екстремумів
-WINDOW_EXTREMUM = 15  # Вікно для екстремумів
+WINDOW_EXTREMUM = 15  # Вікно для екстремумів - 20
 STEP_FOR_HEAD_AND_SHOULDERS = 1  # Крок для голови і плечей
 HEAD_AND_SHOULDERS_THRESHOLD = 0.01  # Різниця між плечами
 
