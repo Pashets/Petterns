@@ -5,15 +5,29 @@ from scipy.signal import argrelextrema
 import matplotlib.cm as cm  # Для роботи з кольоровими картами
 
 from ccxt_utils import get_ohlcv_sync
-from utils import calculate_head_and_shoulders_plus_resistance_and_support
+from config import WINDOW_EXTREMUM, STEP_FOR_HEAD_AND_SHOULDERS, TIMEFRAME, LIMIT_CANDLES, HEAD_AND_SHOULDERS_THRESHOLD
+from utils import PatternChecker, MarketAnalyzer
 
 # 1. Завантаження даних
-ohlcv = get_ohlcv_sync('BTC-USDT', '3d', 200)
+ohlcv = get_ohlcv_sync('BTC-USDT', TIMEFRAME, LIMIT_CANDLES)
 data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'Close', 'volume'])
+pattern_checker = PatternChecker(WINDOW_EXTREMUM, STEP_FOR_HEAD_AND_SHOULDERS)
+
+
+# Обчислення RSI
+def calculate_rsi(data, window=14):
+    """Функція для обчислення RSI."""
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+data['RSI'] = calculate_rsi(data)
 print(data)
-# data['Close'] = data['Close'].rolling(window=3).mean()  # Ковзаюче середнє для згладжування
-window_extremum = 20
-step_for_head_and_shoulders = 1
 
 
 # Визначення рівнів підтримки та опору в межах локального інтервалу
@@ -41,18 +55,17 @@ def calculate_support_resistance(data, window=5):
     return support_levels, resistance_levels
 
 
-# Обчислення рівнів
-support_levels, resistance_levels = calculate_support_resistance(data, window=window_extremum)
+support_levels, resistance_levels = calculate_support_resistance(data, window=WINDOW_EXTREMUM)
 
 
 # Функція для виявлення всіх патернів "Голова та плечі" та їх інверсії
-def detect_all_head_and_shoulders(prices, threshold=0.3):
+def detect_all_head_and_shoulders(prices, threshold=HEAD_AND_SHOULDERS_THRESHOLD):
     patterns = []
     inverted_patterns = []
     for i in range(len(prices) - 5):
         left_shoulder = prices[i]
-        head = prices[i + step_for_head_and_shoulders]
-        right_shoulder = prices[i + step_for_head_and_shoulders * 2]
+        head = prices[i + STEP_FOR_HEAD_AND_SHOULDERS]
+        right_shoulder = prices[i + STEP_FOR_HEAD_AND_SHOULDERS * 2]
 
         # Звичайний патерн: "Голова та плечі"
         if (
@@ -60,8 +73,8 @@ def detect_all_head_and_shoulders(prices, threshold=0.3):
             and right_shoulder < head
             and abs(left_shoulder - right_shoulder) < threshold * head
         ):
-            patterns.append((i, i + step_for_head_and_shoulders,
-                             i + step_for_head_and_shoulders * 2))  # Додаємо індекси плечей і голови
+            patterns.append((i, i + STEP_FOR_HEAD_AND_SHOULDERS,
+                             i + STEP_FOR_HEAD_AND_SHOULDERS * 2))  # Додаємо індекси плечей і голови
 
         # Інверсія: "Зворотна голова та плечі"
         if (
@@ -69,8 +82,8 @@ def detect_all_head_and_shoulders(prices, threshold=0.3):
             and right_shoulder > head
             and abs(left_shoulder - right_shoulder) < threshold * head
         ):
-            inverted_patterns.append((i, i + step_for_head_and_shoulders,
-                                      i + step_for_head_and_shoulders * 2))  # Додаємо індекси плечей і голови
+            inverted_patterns.append((i, i + STEP_FOR_HEAD_AND_SHOULDERS,
+                                      i + STEP_FOR_HEAD_AND_SHOULDERS * 2))  # Додаємо індекси плечей і голови
 
     return patterns, inverted_patterns
 
@@ -86,6 +99,16 @@ plt.plot(data['Close'], label='Ціна закриття', color='blue')
 colormap = cm.get_cmap('tab10')
 num_patterns = len(patterns) + len(inverted_patterns)
 
+
+# Фільтрація сигналів на основі RSI
+rsi_threshold_lower = 30  # Перепроданість
+rsi_threshold_upper = 70  # Перекупленість
+
+# Відфільтровуємо патерни на основі значень RSI
+# patterns = [pattern for pattern in patterns if data['RSI'].iloc[pattern[1]] < rsi_threshold_lower]
+# inverted_patterns = [pattern for pattern in inverted_patterns if
+#                               data['RSI'].iloc[pattern[1]] > rsi_threshold_upper]
+
 # Позначення звичайних патернів
 for idx, pattern in enumerate(patterns):
     color = colormap(idx / num_patterns)
@@ -98,21 +121,41 @@ for idx, pattern in enumerate(inverted_patterns):
 
 # Рівні підтримки
 for idx, level in support_levels:
-    plt.hlines(level, xmin=max(idx - window_extremum, 0), xmax=min(idx + window_extremum, len(data)),
+    plt.hlines(level, xmin=max(idx - WINDOW_EXTREMUM, 0), xmax=min(idx + WINDOW_EXTREMUM, len(data)),
                colors='green', linestyles='solid', label='Локальна підтримка' if idx == support_levels[0][0] else "")
-    plt.vlines(min(idx + window_extremum, len(data)), colors='green', ymin=data['Close'].min(),
-               ymax=data['Close'].max())
+    bet_made = pattern_checker.is_pattern_found(idx, inverted_patterns)
+    vline_style = 'solid' if bet_made else 'dashed'
+    if vline_style == 'solid':
+        plt.vlines(
+            x=min(idx + WINDOW_EXTREMUM, len(data)),
+            colors='green',
+            ymin=data['Close'].min(),
+            ymax=data['Close'].max(),
+            linestyles=vline_style
+        )
 
 # Рівні опору
 for idx, level in resistance_levels:
-    plt.hlines(level, xmin=max(idx - window_extremum, 0), xmax=min(idx + window_extremum, len(data)),
+    plt.hlines(level, xmin=max(idx - WINDOW_EXTREMUM, 0), xmax=min(idx + WINDOW_EXTREMUM, len(data)),
                colors='red', linestyles='solid', label='Локальний опір' if idx == resistance_levels[0][0] else "")
-    plt.vlines(min(idx + window_extremum, len(data)), colors='red', ymin=data['Close'].min(), ymax=data['Close'].max())
+
+    bet_made = pattern_checker.is_pattern_found(idx, patterns)
+    vline_style = 'solid' if bet_made else 'dashed'
+    if vline_style == 'solid':
+        plt.vlines(
+            min(idx + WINDOW_EXTREMUM, len(data)),
+            colors='red',
+            ymin=data['Close'].min(),
+            ymax=data['Close'].max(),
+            linestyles=vline_style
+        )
 
 plt.legend()
-plt.title('Визначення патернів: Голова і плечі та зворотна голова і плечі')
+plt.title('Визначення патернів: Голова і плечі та зворотна голова і плечі з фільтрацією за RSI')
 plt.xlabel('Час')
 plt.ylabel('Ціна')
 plt.show()
-calculate_head_and_shoulders_plus_resistance_and_support(support_levels, resistance_levels, patterns, inverted_patterns,
-                                                         window_extremum, step_for_head_and_shoulders, data)
+
+market_analyzer = MarketAnalyzer(support_levels, resistance_levels, patterns, inverted_patterns,
+                                 WINDOW_EXTREMUM, STEP_FOR_HEAD_AND_SHOULDERS, data)
+market_analyzer.analyze()
