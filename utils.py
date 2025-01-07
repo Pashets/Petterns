@@ -45,7 +45,8 @@ class TradeExecutor:
     def update_trailing_stop_loss(self, roi):
         """Оновлення трейлінг стоп-лосса."""
         self.max_roi = max(self.max_roi, roi)
-        trailing_stop_loss_percent = max(self.max_roi - self.trailing_stop_loss_percent, 7)  # Мінімальний ROI +7%
+        trailing_stop_loss_percent = max(self.max_roi * (100 - self.trailing_stop_loss_percent) / 100, 7)  # Мінімальний ROI +7%
+        print(self.max_roi, trailing_stop_loss_percent)
         if self.direction == 'long':
             self.trailing_stop_loss = self.entry_price * (1 + trailing_stop_loss_percent / 100)
         elif self.direction == 'short':
@@ -91,6 +92,8 @@ class MarketAnalyzer:
         self.levels: List[Level] = sorted(
             [(*s, 'sup') for s in support_levels] + [(*r, 'res') for r in resistance_levels]
         )
+        self.transactions = []
+
 
     def analyze(self):
         for level in self.levels:
@@ -99,6 +102,7 @@ class MarketAnalyzer:
             elif level[2] == 'res':
                 self._process_level(level, self.patterns)
         print(f'Баланс = {self.balance:.2f}')
+        return self.transactions
 
     def _process_level(self, level: Level, pattern_list: List[Pattern]):
         index, _, level_type = level
@@ -143,7 +147,7 @@ class MarketAnalyzer:
             else:
                 if future_price <= stop_loss if direction == 'long' else future_price >= stop_loss:
                     profit_or_loss = -stake_amount * PERCENT_STOP_LOSS / 100
-                    print(f"Стоп-лос досягнуто на індексі {future_index}. Ціна: {future_price:.2f}")
+                    print(f"Стоп-лос досягнуто на індексі {future_index}. Ціна: {future_price:.2f}. ROI: {roi:.2f}%")
                     break
                 elif executor.is_take_profit_hit(future_price, take_profit):
                     print(
@@ -160,11 +164,14 @@ class MarketAnalyzer:
                     future_price - cost) / cost if direction == 'long' else stake_amount * (
                     cost - future_price) / cost
 
-        self.balance += profit_or_loss
-        print(stake_amount, future_price, cost)
+        transaction_fee = stake_amount / 100
+        # transaction_fee = 0
+        print(transaction_fee)
+        self.balance += profit_or_loss - transaction_fee
         print(f"Результат трейду: {'Прибуток' if profit_or_loss > 0 else 'Збиток'} {profit_or_loss:.2f}")
         print(f"Оновлений баланс: {self.balance:.2f}")
 
         self.last_cost = cost
         self.last_level = level[2]
         self.stake_multiplier = 1.0
+        self.transactions.append([(end_level_index, cost), (future_index, future_price, profit_or_loss)])
