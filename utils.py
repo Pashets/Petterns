@@ -60,23 +60,23 @@ class TradeExecutor:
         self.update_state_trailing_stop_loss(price, rsi, long_ema, short_ema)
         self.max_roi = max(self.max_roi, roi)
 
-        # diff_trailing_stop_loss_percent = self.trailing_stop_loss_percent
-        # if self.state_trailing_stop_loss == StateTrailingStopLoss.increased:
-        #     diff_trailing_stop_loss_percent *= 1 + TRAILING_STOP_LOSS_PERCENT_FOR_POSITIVE_FILTER / 100
-        # if self.state_trailing_stop_loss == StateTrailingStopLoss.decreased:
-        #     diff_trailing_stop_loss_percent *= 1 - TRAILING_STOP_LOSS_PERCENT_FOR_NEGATIVE_FILTER / 100
-        #
+        diff_trailing_stop_loss_percent = self.trailing_stop_loss_percent
+        if self.state_trailing_stop_loss == StateTrailingStopLoss.increased:
+            diff_trailing_stop_loss_percent *= 1 + TRAILING_STOP_LOSS_PERCENT_FOR_POSITIVE_FILTER / 100
+        if self.state_trailing_stop_loss == StateTrailingStopLoss.decreased:
+            diff_trailing_stop_loss_percent *= 1 - TRAILING_STOP_LOSS_PERCENT_FOR_NEGATIVE_FILTER / 100
+
         trailing_stop_loss_percent = max(
-            self.max_roi * (100 - TRAILING_STOP_LOSS_PERCENT) / 100,
-            # self.max_roi * (100 - diff_trailing_stop_loss_percent) / 100,
+            # self.max_roi * (100 - TRAILING_STOP_LOSS_PERCENT) / 100,
+            self.max_roi * (100 - diff_trailing_stop_loss_percent) / 100,
             MINIMUM_TRAILING_STOP_LOSS_PERCENT
         )
         if self.direction == 'long':
             self.trailing_stop_loss = self.entry_price * (1 + trailing_stop_loss_percent / 100)
         elif self.direction == 'short':
             self.trailing_stop_loss = self.entry_price * (1 - trailing_stop_loss_percent / 100)
-        # print(self.max_roi, self.trailing_stop_loss_percent, diff_trailing_stop_loss_percent,
-        print(self.max_roi, self.trailing_stop_loss_percent, TRAILING_STOP_LOSS_PERCENT,
+        print(self.max_roi, self.trailing_stop_loss_percent, diff_trailing_stop_loss_percent,
+        # print(self.max_roi, self.trailing_stop_loss_percent, TRAILING_STOP_LOSS_PERCENT,
               trailing_stop_loss_percent, self.trailing_stop_loss)
 
     def update_state_trailing_stop_loss(self, price, rsi, long_ema, short_ema):
