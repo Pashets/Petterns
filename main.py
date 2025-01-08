@@ -124,12 +124,12 @@ plt.plot(data['LONG_EMA'], label=f'LONG_EMA({ema_long_period})', color='green', 
 #     data['RSI'].iloc[pattern[1]] > rsi_threshold_upper
 # ]
 
-patterns = [pattern for pattern in patterns if
-            data['RSI'].iloc[pattern[1]] < rsi_threshold_lower and
-            data['SHORT_EMA'].iloc[pattern[1]] > data['LONG_EMA'].iloc[pattern[1]]]
-inverted_patterns = [pattern for pattern in inverted_patterns if
-                     data['RSI'].iloc[pattern[1]] > rsi_threshold_upper and
-                     data['SHORT_EMA'].iloc[pattern[1]] < data['LONG_EMA'].iloc[pattern[1]]]
+# patterns = [pattern for pattern in patterns if
+#             data['RSI'].iloc[pattern[1]] < rsi_threshold_lower and
+#             data['SHORT_EMA'].iloc[pattern[1]] > data['LONG_EMA'].iloc[pattern[1]]]
+# inverted_patterns = [pattern for pattern in inverted_patterns if
+#                      data['RSI'].iloc[pattern[1]] > rsi_threshold_upper and
+#                      data['SHORT_EMA'].iloc[pattern[1]] < data['LONG_EMA'].iloc[pattern[1]]]
 
 # Позначення звичайних патернів
 # for idx, pattern in enumerate(patterns):
@@ -230,3 +230,9 @@ plt.legend()
 
 plt.show()
 # plot_visualization(data, support_levels,resistance_levels,patterns, inverted_patterns,transactions, WINDOW_EXTREMUM, STEP_FOR_HEAD_AND_SHOULDERS)
+rois = [transaction[1][-1] for transaction in transactions]
+print(rois)
+print(len(rois))
+print(sum(rois))
+print(len([roi for roi in rois if roi > 0]))
+print(len([roi for roi in rois if roi < 0]))
